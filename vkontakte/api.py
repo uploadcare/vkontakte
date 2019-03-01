@@ -1,15 +1,19 @@
 # coding: utf-8
 import random
 import time
-import urllib
 import warnings
-from hashlib import md5
 from functools import partial
+from hashlib import md5
+
+import six
+from six.moves.urllib.parse import urlencode
+
+from vkontakte import http
+
 try:
     import simplejson as json
 except ImportError:
     import json
-from vkontakte import http
 
 API_URL = 'http://api.vk.com/api.php'
 SECURE_API_URL = 'https://api.vk.com/method/'
@@ -21,14 +25,15 @@ REQUEST_ENCODING = 'utf8'
 # http://vk.com/developers.php?o=-1&p=%D0%A0%D0%B0%D1%81%D1%88%D0%B8%D1%80%D0%B5%D0%BD%D0%BD%D1%8B%D0%B5_%D0%BC%D0%B5%D1%82%D0%BE%D0%B4%D1%8B_API&s=0
 # http://vk.com/developers.php?o=-1&p=%D0%9E%D0%BF%D0%B8%D1%81%D0%B0%D0%BD%D0%B8%D0%B5_%D0%BC%D0%B5%D1%82%D0%BE%D0%B4%D0%BE%D0%B2_API&s=0
 COMPLEX_METHODS = ['secure', 'ads', 'messages', 'likes', 'friends',
-    'groups', 'photos', 'wall', 'newsfeed', 'notifications', 'audio',
-    'video', 'docs', 'places', 'storage', 'notes', 'pages',
-    'activity', 'offers', 'questions', 'subscriptions',
-    'users', 'status', 'polls', 'account', 'auth', 'stats', 'database']
+                   'groups', 'photos', 'wall', 'newsfeed', 'notifications', 'audio',
+                   'video', 'docs', 'places', 'storage', 'notes', 'pages',
+                   'activity', 'offers', 'questions', 'subscriptions',
+                   'users', 'status', 'polls', 'account', 'auth', 'stats', 'database']
 
 
 class VKError(Exception):
     __slots__ = ["error"]
+
     def __init__(self, error_data):
         self.error = error_data
         Exception.__init__(self, str(self))
@@ -45,25 +50,32 @@ class VKError(Exception):
     def params(self):
         return self.error['request_params']
 
+    @property
+    def redirect_uri(self):
+        return self.error['redirect_uri']
+
     def __str__(self):
         return "Error(code = '%s', description = '%s', params = '%s')" % (self.code, self.description, self.params)
+
 
 def _encode(s):
     if isinstance(s, (dict, list, tuple)):
         s = json.dumps(s, ensure_ascii=False, encoding=REQUEST_ENCODING)
 
-    if isinstance(s, unicode):
+    if isinstance(s, six.string_types):
         s = s.encode(REQUEST_ENCODING)
 
-    return s # this can be number, etc.
+    return s  # this can be number, etc.
+
 
 def _json_iterparse(response):
-    response = response.strip().decode('utf8', 'ignore').encode('utf8')
+    response = response.strip().decode('utf8', 'ignore')
     decoder = json.JSONDecoder(encoding="utf8", strict=False)
     idx = 0
     while idx < len(response):
         obj, idx = decoder.raw_decode(response, idx)
         yield obj
+
 
 def signature(api_secret, params):
     keys = sorted(params.keys())
@@ -72,13 +84,15 @@ def signature(api_secret, params):
 
 # We have to support this:
 #
-#   >>> vk = API(key, secret)
-#   >>> vk.get('getServerTime')  # "get" is a method of API class
-#   >>> vk.friends.get(uid=123)  # "get" is a part of vkontakte method name
+# >>> vk = API(key, secret)
+# >>> vk.get('getServerTime')  # "get" is a method of API class
+# >>> vk.friends.get(uid=123)  # "get" is a part of vkontakte method name
 #
 # It works this way: API class has 'get' method but _API class doesn't.
 
+
 class _API(object):
+
     def __init__(self, api_id=None, api_secret=None, token=None, **defaults):
 
         if not (api_id and api_secret or token):
@@ -112,9 +126,9 @@ class _API(object):
         raise VKError(errors[0])
 
     def __getattr__(self, name):
-        '''
+        """
         Support for api.<method>.<methodName> syntax
-        '''
+        """
         if name in COMPLEX_METHODS:
             api = _API(api_id=self.api_id, api_secret=self.api_secret, token=self.token, **self.defaults)
             api.method_prefix = name + '.'
@@ -134,7 +148,7 @@ class _API(object):
 
     def _request(self, method, timeout=DEFAULT_TIMEOUT, **kwargs):
 
-        for key, value in kwargs.iteritems():
+        for key, value in six.iteritems(kwargs):
             kwargs[key] = _encode(value)
 
         if self.token:
@@ -160,7 +174,7 @@ class _API(object):
             params['sig'] = self._signature(params)
             url = API_URL
             secure = False
-        data = urllib.urlencode(params)
+        data = urlencode(params)
 
         headers = {"Accept": "application/json",
                    "Content-Type": "application/x-www-form-urlencoded"}

@@ -7,6 +7,8 @@ vkontakte
 .. image:: https://coveralls.io/repos/kmike/vkontakte/badge.png?branch=master
    :target: https://coveralls.io/r/kmike/vkontakte
 
+This repo is a fork of https://bitbucket.org/kmike/vkontakte/ and updated prior to support python3.
+
 This is a vk.com (aka vkontakte.ru, largest Russian social network)
 python API wrapper. The goal is to support all API methods (current and future)
 that can be accessed from server.

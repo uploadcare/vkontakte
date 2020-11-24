@@ -4,16 +4,13 @@ import time
 import warnings
 from functools import partial
 from hashlib import md5
+import json
 
 import six
 from six.moves.urllib.parse import urlencode
 
 from vkontakte import http
-
-try:
-    import simplejson as json
-except ImportError:
-    import json
+    
 
 API_URL = 'http://api.vk.com/api.php'
 SECURE_API_URL = 'https://api.vk.com/method/'
@@ -60,9 +57,12 @@ class VKError(Exception):
 
 def _encode(s):
     if isinstance(s, (dict, list, tuple)):
-        s = json.dumps(s, ensure_ascii=False, encoding=REQUEST_ENCODING)
+        s = json.dumps(s, ensure_ascii=False)
 
-    if isinstance(s, six.string_types):
+    if not isinstance(s, six.binary_type):
+        s = str(s)
+
+    if isinstance(s, six.text_type):
         s = s.encode(REQUEST_ENCODING)
 
     return s  # this can be number, etc.
@@ -70,7 +70,7 @@ def _encode(s):
 
 def _json_iterparse(response):
     response = response.strip().decode('utf8', 'ignore')
-    decoder = json.JSONDecoder(encoding="utf8", strict=False)
+    decoder = json.JSONDecoder(strict=False)
     idx = 0
     while idx < len(response):
         obj, idx = decoder.raw_decode(response, idx)
@@ -79,8 +79,8 @@ def _json_iterparse(response):
 
 def signature(api_secret, params):
     keys = sorted(params.keys())
-    param_str = "".join(["%s=%s" % (str(key), _encode(params[key])) for key in keys])
-    return md5(param_str + str(api_secret)).hexdigest()
+    param_str = b"".join([b"%s=%s" % (key.encode('utf8'), _encode(params[key])) for key in keys])
+    return md5(param_str + api_secret.encode('utf8')).hexdigest()
 
 # We have to support this:
 #
